@@ -42,6 +42,10 @@ const (
   IF = "IF"
   ELSE = "ELSE"
   RETURN = "RETURN"
+  
+  // double char operators 
+  EQ = "=="
+  NOT_EQ = "!="
 
 )
 
