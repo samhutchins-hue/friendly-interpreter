@@ -5,12 +5,24 @@ import (
   "friendly-interpreter/ast"
   "friendly-interpreter/lexer"
   "friendly-interpreter/token"
+  "strconv"
+)
+
+const (
+  _ int = iota
+  LOWEST
+  EQUALS // ==
+  LESSGREATER // < or >
+  SUM // +
+  PRODUCT // *
+  PREFIX // -X or !X
+  CALL // myFunction(X)
 )
 
 type (
   prefixParseFn func() ast.Expression
   infixParseFn func(ast.Expression) ast.Expression
-) 
+  ) 
 
 type Parser struct {
   l *lexer.Lexer
@@ -28,23 +40,32 @@ func New(l *lexer.Lexer) *Parser {
   p := &Parser{
     l: l,
     errors: []string{},
-  }
 
-  func (p *Parser) Errors() []string {
-    return p.errors
   }
+  p.prefixParseFns = make(map[token.TokenType]prefixParseFn)
+  p.registerPrefix(token.IDENT, p.parseIdentifier)
+  p.registerPrefix(token.INT, p.parseIntegerLiteral)
+}
 
-  func (p *Parser) peekError(t token.TokenType) {
+func (p *Parser) parseIdentifier() ast.Expression {
+  return &ast.Identifier{Token: p.curToken, Value: p.curToken.Literal}
+}
+
+func (p *Parser) Errors() []string {
+  return p.errors
+}
+
+func (p *Parser) peekError(t token.TokenType) {
   msg := fmt.Sprint("expected next token to be %s, got %s instead",
     t, p.peekToken.Type)
   p.errors = append(p.errors, msg)
-}
+  //}
 
-// Read two tokens, so curToken and peekToken are both set
-p.nextToken()
-p.nextToken()
+  // Read two tokens, so curToken and peekToken are both set
+  p.nextToken()
+  p.nextToken()
 
-return p
+  return p
 }
 
 func (p *Parser) nextToken() {
@@ -75,7 +96,7 @@ func (p *Parser) parseStatment() ast.Statement {
     return p.parseReturnStatement()
   default:
     return nil
-  }
+}
 }
 
 func (p *Parser) parseLetStatement() *ast.LetStatement {
@@ -142,11 +163,11 @@ func (p *Parser) registerInfix(tokenType token.TokenType, fn infixParseFn) {
 func (p *Parser) parseStatment() ast.Statement {
   swtich p.curToken.Type {
     case token.LET:
-      return p.parseLetStatement()
+    return p.parseLetStatement()
     case token.RETURN:
-      return p.parseReturnStatement()
+    return p.parseReturnStatement()
     default:
-      return p.parseExpressionStatement()
+    return p.parseExpressionStatement()
   }
 }
 
@@ -160,4 +181,27 @@ func (p *Parser) parseExpressionStatement() *ast.ExpressionStatement {
   }
 
   return stmt
+}
+
+func (p *Parser) parseExpression(precedence int) ast.Expression {
+  prefix := p.prefixParseFns[p.curToken.Type]
+  if prefix == nil {
+    return nil
+  }
+  leftExp := prefix()
+
+  return leftExp
+}
+
+func (p *Parser) parseIntegerLiteral() ast.Expression {
+  lit := &ast.IntegerLiteral{Token: p.curToken }
+
+  value, err := strconv.ParseInt(p.curToken.Literal, 0, 64)
+  if err != nil {
+    msg := fmt.Sprintf("could not parse %q as integer", p.curToken.Literal)
+    p.errors = append(p.errors, msg)
+    return nil
+  }
+  lit.Value = value
+  return lit
 }
